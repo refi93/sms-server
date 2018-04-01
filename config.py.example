@@ -1,0 +1,5 @@
+senders_whitelist = [
+    "+421904888888"
+]
+
+sim_card_pin = "0000"
