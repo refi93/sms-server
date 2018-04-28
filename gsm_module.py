@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import serial
+from datetime import datetime
 
 import config
+import db
+from models import MessageToSend, ReceivedMessage
 
-port = serial.Serial("/dev/ttyUSB0",  9600, timeout=4)
+port = serial.Serial(config.serial_port,  9600, timeout=4)
 if (not port.isOpen()):
     port.open()
 
@@ -15,7 +18,7 @@ def send_at_command(command, append_eol=True):
     return list(map(lambda elem: elem.decode("utf-8"), port.readlines()))
 
 
-def init_gsm_module(pin=None):
+def init(pin=None):
     while True:
         result = send_at_command("ATI")
         if len(result) > 0 and result[-1] == "OK\r\n":
@@ -71,12 +74,17 @@ def get_sms_messages(category="ALL"):
 
     result = []
     response_raw = send_at_command("AT+CMGL=" + category)
+
+    print(response_raw)
+
     sms_list_raw = response_raw[2:-2]
     # the odd elements are sms metadata, the even ones are sms texts
     sms_pairs = zip(sms_list_raw[0::2], sms_list_raw[1::2])
 
     for sms_meta, sms_text in sms_pairs:
         result.append(parse_sms(sms_meta, sms_text))
+
+    print(result)
 
     return result
 
@@ -103,5 +111,30 @@ def parse_sms(sms_meta, sms_text):
         'text': sms_text
     }
 
+if __name__ == '__main__':
+    init(pin=config.sim_card_pin)
 
-init_gsm_module(config.sim_card_pin)
+    while (True):
+        # check received messages
+        for sms_message in get_sms_messages():
+            print('new message arrived')
+            msg = ReceivedMessage(
+                phone_from=sms_message['sender'],
+                msg_body=sms_message['text'],
+            )
+
+            db.session.add(msg)
+            db.session.commit()
+            delete_sms_message(sms_message["index"])
+
+        # send messages waiting to be sent
+        messages_to_send = (
+            db.query(MessageToSend)
+            .filter(MessageToSend.sent_at.is_(None))
+            .all()
+        )
+        for message in messages_to_send:
+            send_sms_message(message.phone_to, message.msg_body)
+            
+            message.sent_at = datetime.utcnow()
+            db.session.commit()

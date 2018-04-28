@@ -1,1 +1,11 @@
-pyserial
+certifi==2018.4.16
+chardet==3.0.4
+future==0.16.0
+idna==2.6
+iso8601==0.1.12
+pyserial==3.4
+PyYAML==3.12
+requests==2.18.4
+SQLAlchemy==1.2.7
+Unidecode==1.0.22
+urllib3==1.22

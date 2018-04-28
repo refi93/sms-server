@@ -1,39 +1,43 @@
 import requests
 from math import radians, cos, sin, asin, sqrt
-
 import math
+from unidecode import unidecode
 
+import config
 from .sms_app import SmsApp
 import gsm_module
 
 
-directions_api_url = "http://maps.google.com/maps/api/geocode/json"
+geocode_api_url = "https://maps.google.com/maps/api/geocode/json"
 
 
 class Navigator(SmsApp):
     def should_handle(self, sms):
-        return sms["text"].lower().startswith("navigate")
+        return sms.msg_body.lower().startswith("navigate")
 
-    def handle(self, sms):
-        sms_text_splitted = sms["text"].split("\"")
+    def get_response(self, sms):
+        sms_text_splitted = sms.msg_body.split("\"")
         origin = sms_text_splitted[1]
         destination = sms_text_splitted[3]
 
-        origin_data = requests.get(directions_api_url, {
-            "address": origin
-        }).json()["results"][0]
+        origin_info = self.get_address_info(origin)
+        destination_info = self.get_address_info(destination)
 
-        destination_data = requests.get(directions_api_url, {
-            "address": destination
-        }).json()["results"][0]
-
-        origin_coord = (origin_data["geometry"]["location"]["lat"], origin_data["geometry"]["location"]["lng"])
-        destination_coord = (destination_data["geometry"]["location"]["lat"], destination_data["geometry"]["location"]["lng"])
+        origin_coord = (origin_info["geometry"]["location"]["lat"], origin_info["geometry"]["location"]["lng"])
+        destination_coord = (destination_info["geometry"]["location"]["lat"], destination_info["geometry"]["location"]["lng"])
 
         distance = int(haversine(origin_coord, destination_coord))
         compass_bearing = int(get_compass_bearing(origin_coord, destination_coord))
 
-        return "Distance: " + distance_to_str(distance) + "\r\nHeading: " + str(compass_bearing) + " deg\r\nParsed origin: " + origin_data["formatted_address"][:30] + "\r\nParsed destination: " + destination_data["formatted_address"][:30]
+        return "Dist: " + distance_to_str(distance) + "\r\nHead: " + str(compass_bearing) + " deg\r\nOrig: " + unidecode(origin_info["formatted_address"][:42]) + "\r\nDest: " + unidecode(destination_info["formatted_address"][:42])
+
+    def get_address_info(self, address):
+        response = requests.get(geocode_api_url, {
+            "address": address,
+            "key": config.geocode_api_key,
+        }).json()
+        
+        return response["results"][0]
 
 
 def distance_to_str(distance_in_m):
