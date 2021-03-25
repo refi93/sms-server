@@ -4,7 +4,7 @@ future==0.16.0
 idna==2.6
 iso8601==0.1.12
 pyserial==3.4
-PyYAML==3.12
+PyYAML==5.4
 requests==2.18.4
 SQLAlchemy==1.2.7
 Unidecode==1.0.22
